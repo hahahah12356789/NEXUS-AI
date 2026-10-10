@@ -29,7 +29,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 从云端 Secrets 读取密钥（如果是在本地测试，它会尝试从 config.json 读）
 try:
     DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
     TAVILY_API_KEY = st.secrets["TAVILY_API_KEY"]
@@ -75,7 +74,6 @@ if ACCESS_PASSWORD and not st.session_state.password_correct:
         st.warning("密码错误，无法使用。")
     st.stop()
 
-# 🌟 核心改变：不再读写本地文件，聊天记录只存在用户浏览器里
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -101,14 +99,16 @@ def clean_messages(messages):
             i += 1
     return cleaned
 
-# 🌟 新增：强制页面滚动到底部的函数
-def scroll_to_bottom():
+# 🌟 强制滚动到底部（无论用户在哪）
+def force_scroll_bottom():
     js = """
     <script>
-        var target = window.parent.document.querySelector('section.main');
-        if (target) {
-            target.scrollTop = target.scrollHeight;
-        }
+        setTimeout(function() {
+            var target = window.parent.document.querySelector('section.main');
+            if (target) {
+                target.scrollTop = target.scrollHeight;
+            }
+        }, 100);
     </script>
     """
     components.html(js, height=0)
@@ -128,6 +128,7 @@ prompt = st.chat_input("💬 输入指令，NEXUS 将为你联网检索...")
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user", avatar="👤").write(prompt)
+    force_scroll_bottom()  # 用户发送消息后，立即滚动到底部
 
     client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com/v1")
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
@@ -161,8 +162,8 @@ if prompt:
                 st.markdown("<div class='disclaimer'>本回答由 AI 生成，内容仅供参考，请仔细甄别。</div>", unsafe_allow_html=True)
             
             st.session_state.messages.append({"role": "assistant", "content": final_answer})
-            scroll_to_bottom() # 触发滚动
-            
+            force_scroll_bottom()  # AI 回答完成后，再次强制滚动
+
         else:
             with st.chat_message("assistant", avatar="🌐"):
                 stream = client.chat.completions.create(model="deepseek-chat", messages=[{"role": "system", "content": system_prompt}] + clean_messages(st.session_state.messages), stream=True)
@@ -170,7 +171,7 @@ if prompt:
                 st.markdown("<div class='disclaimer'>本回答由 AI 生成，内容仅供参考，请仔细甄别。</div>", unsafe_allow_html=True)
             
             st.session_state.messages.append({"role": "assistant", "content": final_answer})
-            scroll_to_bottom() # 触发滚动
+            force_scroll_bottom()  # AI 回答完成后，再次强制滚动
 
     except Exception as e:
         st.error(f"🚨 系统异常：{e}")
