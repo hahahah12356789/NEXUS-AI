@@ -28,18 +28,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 从云端 Secrets 读取密钥（如果是在本地测试，它会尝试从 config.json 读）
 try:
     DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
     TAVILY_API_KEY = st.secrets["TAVILY_API_KEY"]
-    ACCESS_PASSWORD = st.secrets.get("ACCESS_PASSWORD", "") # 如果没有设置密码，默认空
+    ACCESS_PASSWORD = st.secrets.get("ACCESS_PASSWORD", "")
 except:
-    # 本地测试时的兜底
     DEEPSEEK_API_KEY = ""
     TAVILY_API_KEY = ""
     ACCESS_PASSWORD = ""
 
-# 如果本地没有配置 Secrets，才尝试读本地文件
 if not DEEPSEEK_API_KEY and os.path.exists("config.json"):
     try:
         with open("config.json", "r", encoding="utf-8") as f:
@@ -60,19 +57,22 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# 检查是否配置了密钥
 if not DEEPSEEK_API_KEY or not TAVILY_API_KEY:
     st.error("⚠️ 系统后台未配置 API Key，请联系管理员。")
     st.stop()
 
-# ================= 强制要求输入访问密码 =================
-if ACCESS_PASSWORD:
-    pwd = st.text_input("🔒 请输入访问密码", type="password")
-    if pwd != ACCESS_PASSWORD:
-        st.warning("密码错误，无法使用。")
-        st.stop()
+if "password_correct" not in st.session_state:
+    st.session_state.password_correct = False
 
-# ================= 以下为聊天逻辑 =================
+if ACCESS_PASSWORD and not st.session_state.password_correct:
+    pwd = st.text_input("🔒 请输入访问密码", type="password")
+    if pwd == ACCESS_PASSWORD:
+        st.session_state.password_correct = True
+        st.rerun()
+    elif pwd:
+        st.warning("密码错误，无法使用。")
+    st.stop()
+
 HISTORY_FILE = "chat_history.json"
 
 if "messages" not in st.session_state:
