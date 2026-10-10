@@ -73,15 +73,9 @@ if ACCESS_PASSWORD and not st.session_state.password_correct:
         st.warning("密码错误，无法使用。")
     st.stop()
 
-HISTORY_FILE = "chat_history.json"
-
+# 🌟 核心改变：不再读写本地文件，聊天记录只存在用户浏览器里
 if "messages" not in st.session_state:
-    if os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            try: st.session_state.messages = json.load(f)
-            except: st.session_state.messages = []
-    else:
-        st.session_state.messages = []
+    st.session_state.messages = []
 
 def clean_messages(messages):
     cleaned = []
@@ -159,8 +153,5 @@ if prompt:
                 st.markdown("<div class='disclaimer'>本回答由 AI 生成，内容仅供参考，请仔细甄别。</div>", unsafe_allow_html=True)
             st.session_state.messages.append({"role": "assistant", "content": final_answer})
 
-        cleaned_history = clean_messages(st.session_state.messages)
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(cleaned_history, f, ensure_ascii=False, indent=2)
     except Exception as e:
         st.error(f"🚨 系统异常：{e}")
