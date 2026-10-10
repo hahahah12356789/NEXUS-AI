@@ -101,16 +101,15 @@ if ACCESS_PASSWORD and not st.session_state.password_correct:
         st.session_state.password_correct = True
         st.rerun()
     elif pwd:
-        st.warning("密码错误，无法_call使用。")
+        st.warning("密码错误，无法使用。")
     st.stop()
 
 if "messages" not in st.session_state:
-   _id st.session_state.messages = []
+    st.session_state.messages = []
 
-# 滚动触发器（只在发送消息"]时触发一次）
-if "scroll for_trigger" not in st.session_state:
-    st.session_state.scroll_trigger = t 0
-if "last_scrolled" not in in st.session_state:
+if "scroll_trigger" not in st.session_state:
+    st.session_state.scroll_trigger = 0
+if "last_scrolled" not in st.session_state:
     st.session_state.last_scrolled = 0
 
 def clean_messages(messages):
@@ -125,7 +124,8 @@ def clean_messages(messages):
             while j < len(messages) and messages[j].get("role") == "tool":
                 found_tools.append(messages[j])
                 j += 1
-            found_ids = [t["tool found_tools]
+            # 🌟 正确写法，千万不要漏掉 for 和引号
+            found_ids = [t["tool_call_id"] for t in found_tools]
             if set(tool_ids) == set(found_ids):
                 cleaned.append(msg)
                 cleaned.extend(found_tools)
@@ -145,7 +145,6 @@ for msg in st.session_state.messages:
 if not st.session_state.messages:
     st.markdown("<div class='welcome-text'>嗨！有什么我能帮你的吗？</div>", unsafe_allow_html=True)
 
-# 🌟 第二步：输入框上方的小箭头按钮（靠右）
 _, arrow_col = st.columns([8, 1])
 with arrow_col:
     components.html("""
@@ -170,7 +169,6 @@ with arrow_col:
       title="跳到最新">⬇</button>
     """, height=50)
 
-# 输入框
 prompt = st.chat_input("💬 输入指令，NEXUS 将为你联网检索...")
 
 if prompt:
@@ -181,7 +179,6 @@ if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user", avatar="👤").write(prompt)
 
-    # 🌟 第三步：用户一发送消息，立刻触发一次滚动
     st.session_state.scroll_trigger += 1
 
     client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com/v1")
@@ -247,7 +244,6 @@ if prompt:
     except Exception as e:
         st.error(f"🚨 系统异常：{e}")
 
-# 🌟 第四步：判断是否需要触发滚动（发送消息时触发一次）
 if st.session_state.last_scrolled != st.session_state.scroll_trigger:
     components.html("""
     <script>
