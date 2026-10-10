@@ -6,7 +6,6 @@ import streamlit as st
 import openai
 from tavily import TavilyClient
 import json
-import streamlit.components.v1 as components
 
 st.set_page_config(page_title="NEXUS 🌐 AI", page_icon="🌐", layout="centered", initial_sidebar_state="collapsed")
 
@@ -29,6 +28,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ================= 读取配置 =================
 try:
     DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
     TAVILY_API_KEY = st.secrets["TAVILY_API_KEY"]
@@ -46,6 +46,7 @@ if not DEEPSEEK_API_KEY and os.path.exists("config.json"):
             TAVILY_API_KEY = local_config.get("tavily_key", "")
     except: pass
 
+# ================= Logo =================
 st.markdown("""
 <div class="logo-container">
     <svg width="70" height="70" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -62,6 +63,7 @@ if not DEEPSEEK_API_KEY or not TAVILY_API_KEY:
     st.error("⚠️ 系统后台未配置 API Key，请联系管理员。")
     st.stop()
 
+# ================= 密码验证（输入正确后隐藏） =================
 if "password_correct" not in st.session_state:
     st.session_state.password_correct = False
 
@@ -74,6 +76,7 @@ if ACCESS_PASSWORD and not st.session_state.password_correct:
         st.warning("密码错误，无法使用。")
     st.stop()
 
+# ================= 聊天记忆 =================
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -99,20 +102,7 @@ def clean_messages(messages):
             i += 1
     return cleaned
 
-# 🌟 强制滚动到底部（无论用户在哪）
-def force_scroll_bottom():
-    js = """
-    <script>
-        setTimeout(function() {
-            var target = window.parent.document.querySelector('section.main');
-            if (target) {
-                target.scrollTop = target.scrollHeight;
-            }
-        }, 100);
-    </script>
-    """
-    components.html(js, height=0)
-
+# ================= 渲染历史记录 =================
 for msg in st.session_state.messages:
     if msg["role"] == "user":
         st.chat_message("user", avatar="👤").write(msg["content"])
@@ -123,12 +113,12 @@ for msg in st.session_state.messages:
 if not st.session_state.messages:
     st.markdown("<div class='welcome-text'>嗨！有什么我能帮你的吗？</div>", unsafe_allow_html=True)
 
+# ================= 接收用户输入 =================
 prompt = st.chat_input("💬 输入指令，NEXUS 将为你联网检索...")
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user", avatar="👤").write(prompt)
-    force_scroll_bottom()  # 用户发送消息后，立即滚动到底部
 
     client = openai.OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com/v1")
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
@@ -139,11 +129,21 @@ if prompt:
 
     try:
         valid_messages = clean_messages(st.session_state.messages)
-        response = client.chat.completions.create(model="deepseek-chat", messages=[{"role": "system", "content": system_prompt}] + valid_messages, tools=tools, tool_choice="auto")
+
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "system", "content": system_prompt}] + valid_messages,
+            tools=tools,
+            tool_choice="auto"
+        )
         response_message = response.choices[0].message
 
         if response_message.tool_calls:
-            assistant_msg = {"role": "assistant", "content": response_message.content if response_message.content else "", "tool_calls": [{"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in response_message.tool_calls]}
+            assistant_msg = {
+                "role": "assistant",
+                "content": response_message.content if response_message.content else "",
+                "tool_calls": [{"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in response_message.tool_calls]
+            }
             st.session_state.messages.append(assistant_msg)
 
             with st.status("🕵️ NEXUS 正在扫描互联网...", expanded=False) as status:
@@ -156,22 +156,29 @@ if prompt:
                 status.update(label="✅ 检索完毕，NEXUS 正在生成回复...", state="complete", expanded=False)
 
             valid_messages = clean_messages(st.session_state.messages)
+
             with st.chat_message("assistant", avatar="🌐"):
-                stream = client.chat.completions.create(model="deepseek-chat", messages=[{"role": "system", "content": system_prompt}] + valid_messages, stream=True)
+                stream = client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=[{"role": "system", "content": system_prompt}] + valid_messages,
+                    stream=True
+                )
                 final_answer = st.write_stream(stream)
                 st.markdown("<div class='disclaimer'>本回答由 AI 生成，内容仅供参考，请仔细甄别。</div>", unsafe_allow_html=True)
-            
+
             st.session_state.messages.append({"role": "assistant", "content": final_answer})
-            force_scroll_bottom()  # AI 回答完成后，再次强制滚动
 
         else:
             with st.chat_message("assistant", avatar="🌐"):
-                stream = client.chat.completions.create(model="deepseek-chat", messages=[{"role": "system", "content": system_prompt}] + clean_messages(st.session_state.messages), stream=True)
+                stream = client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=[{"role": "system", "content": system_prompt}] + clean_messages(st.session_state.messages),
+                    stream=True
+                )
                 final_answer = st.write_stream(stream)
                 st.markdown("<div class='disclaimer'>本回答由 AI 生成，内容仅供参考，请仔细甄别。</div>", unsafe_allow_html=True)
-            
+
             st.session_state.messages.append({"role": "assistant", "content": final_answer})
-            force_scroll_bottom()  # AI 回答完成后，再次强制滚动
 
     except Exception as e:
         st.error(f"🚨 系统异常：{e}")
