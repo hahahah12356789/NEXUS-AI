@@ -6,6 +6,7 @@ import streamlit as st
 import openai
 from tavily import TavilyClient
 import json
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="NEXUS 🌐 AI", page_icon="🌐", layout="centered", initial_sidebar_state="collapsed")
 
@@ -28,6 +29,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# 从云端 Secrets 读取密钥（如果是在本地测试，它会尝试从 config.json 读）
 try:
     DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
     TAVILY_API_KEY = st.secrets["TAVILY_API_KEY"]
@@ -99,6 +101,18 @@ def clean_messages(messages):
             i += 1
     return cleaned
 
+# 🌟 新增：强制页面滚动到底部的函数
+def scroll_to_bottom():
+    js = """
+    <script>
+        var target = window.parent.document.querySelector('section.main');
+        if (target) {
+            target.scrollTop = target.scrollHeight;
+        }
+    </script>
+    """
+    components.html(js, height=0)
+
 for msg in st.session_state.messages:
     if msg["role"] == "user":
         st.chat_message("user", avatar="👤").write(msg["content"])
@@ -145,13 +159,18 @@ if prompt:
                 stream = client.chat.completions.create(model="deepseek-chat", messages=[{"role": "system", "content": system_prompt}] + valid_messages, stream=True)
                 final_answer = st.write_stream(stream)
                 st.markdown("<div class='disclaimer'>本回答由 AI 生成，内容仅供参考，请仔细甄别。</div>", unsafe_allow_html=True)
+            
             st.session_state.messages.append({"role": "assistant", "content": final_answer})
+            scroll_to_bottom() # 触发滚动
+            
         else:
             with st.chat_message("assistant", avatar="🌐"):
                 stream = client.chat.completions.create(model="deepseek-chat", messages=[{"role": "system", "content": system_prompt}] + clean_messages(st.session_state.messages), stream=True)
                 final_answer = st.write_stream(stream)
                 st.markdown("<div class='disclaimer'>本回答由 AI 生成，内容仅供参考，请仔细甄别。</div>", unsafe_allow_html=True)
+            
             st.session_state.messages.append({"role": "assistant", "content": final_answer})
+            scroll_to_bottom() # 触发滚动
 
     except Exception as e:
         st.error(f"🚨 系统异常：{e}")
